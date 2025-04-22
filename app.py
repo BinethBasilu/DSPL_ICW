@@ -9,10 +9,11 @@ import datetime
 st.set_page_config(layout="wide")
 st.title(" Food Price Changes In Sri Lanka Over the Time")
 #import dataset
-df = pd.read_csv("SL_FoodPrice.csv")
+df = pd.read_csv("SL_FoodPriceChanges.csv")
 df['date'] = pd.to_datetime(df['date'], errors='coerce')
 st.write("Here's the dataset:")
 st.dataframe(df)
+
 # Sidebar
 st.sidebar.title("Navigation")
 page = st.sidebar.selectbox("Choose a page", ["Food Prices", "Overview", "About"])
@@ -47,6 +48,7 @@ def set_background(image_url):
 
 set_background(backgrounds[page])
 if page == "Food Prices":
+
     st.sidebar.subheader('Query Parameter')
     start_date = st.sidebar.date_input("Start date", datetime.date(2004, 1, 15))
     end_date = st.sidebar.date_input("End date", datetime.date(2025, 3, 15))
@@ -71,16 +73,16 @@ if page == "Food Prices":
     # Filter data based on selection
     filtered_df = df[df['pricetype'] == selected_saletype]
     # Get unique categories from the 'category' column
-    District = df['district'].dropna().unique()
+    District = df['District'].dropna().unique()
     selected_district = st.sidebar.selectbox("Choose a district", sorted(District))
     # Filter data based on selection
-    filtered_df = df[df['district'] == selected_district]
+    filtered_df = df[df['District'] == selected_district]
      # ✅ Apply ALL filters at once
     filtered_df = df[
         (df['category'] == selected_category) &
         (df['commodity'] == selected_commodity) &
         (df['pricetype'] == selected_saletype) &
-        (df['district'] == selected_district) 
+        (df['District'] == selected_district) 
     ]
     filtered_df = filtered_df[
         filtered_df['date'].between(pd.to_datetime(start_date), pd.to_datetime(end_date))
@@ -100,9 +102,73 @@ if page == "Food Prices":
         st.line_chart(price_chart_data, x='date', y='price')
     else:
         st.warning("Filtered data is empty or missing 'SL_FoodPrice'/'price' columns.")
-
 if page == "Overview":
+    st.markdown(
+        "<p style='font-size:22px; color:White;'>Overview:</p>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<p style='font-size:18px; color:orange;'>Here's the first few rows of dataset (After Preparation):</p>",
+        unsafe_allow_html=True
+    )
+    # Display the DataFrame
+    st.dataframe(df.head())
+    # Create three columns
+    col1, col2, col3 = st.columns(3)
+
+    # ---- Column 1: Summary Statistics ----
+    with col1:
+        st.markdown(
+        "<p style='font-size:18px; color:orange;'>📊 Summary Statistics</p>",
+        unsafe_allow_html=True
+        )
+
+         
     
+        st.dataframe(df.describe())
+    # ---- Column 2: DataFrame Info ----
+    with col2:
+        st.markdown(
+        "<p style='font-size:18px; color:orange;'>🧾 Dataset Info</p>",
+        unsafe_allow_html=True
+        )
+    
+
+        # Use df.dtypes and df.isnull().sum() to create a table manually
+        info_table = pd.DataFrame({
+            'Column': df.columns,
+            'Non-Null Count': df.notnull().sum().values,
+            'Dtype': df.dtypes.values
+        })
+
+        # Reset index for clean display
+        info_table.reset_index(drop=True, inplace=True)
+
+        # Display as a table
+        st.dataframe(info_table)
+
+    # ---- Column 3: Missing Values Count ----
+    with col3:
+        st.markdown(
+        "<p style='font-size:18px; color:orange;'>❗ Missing Values</p>",
+        unsafe_allow_html=True
+        )
+    
+        missing_counts = df.isnull().sum()
+        missing_df = missing_counts[missing_counts > 0].reset_index()
+        missing_df.columns = ['Column', 'Missing Values']
+    
+        if not missing_df.empty:
+            st.dataframe(missing_df)
+        else:
+            st.success("No missing values found 🎉")
+
+
+
+            
+
+
 
 
 
