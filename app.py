@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
+import matplotlib.pyplot as plt
+
+
 
 
 
@@ -48,7 +51,6 @@ def set_background(image_url):
 
 set_background(backgrounds[page])
 if page == "Food Prices":
-
     st.sidebar.subheader('Query Parameter')
     start_date = st.sidebar.date_input("Start date", datetime.date(2004, 1, 15))
     end_date = st.sidebar.date_input("End date", datetime.date(2025, 3, 15))
@@ -102,7 +104,57 @@ if page == "Food Prices":
         st.line_chart(price_chart_data, x='date', y='price')
     else:
         st.warning("Filtered data is empty or missing 'SL_FoodPrice'/'price' columns.")
+    # Title for the Streamlit page
+    st.title("Categories by Economic Centers")
+
+    # Filter dataset
+    economic_centers = [
+        'Economic Centre-Dambulla', 
+        'Economic Centre - Peliyagoda', 
+        'Economic Centre-Pettah', 
+        'Fish market-Peliyagoda', 
+        'Fish market-Negombo', 
+        'Economic Centre-Maradagahamula',
+        'National Average'
+    ]
+
+
+    filtered_df = df[df['market'].isin(economic_centers)]
+    
+   
+    category_options = filtered_df['category'].unique()
+    selected_category = st.selectbox("Select Category", category_options)
+    # Filter by selected category
+    category_df = filtered_df[filtered_df['category'] == selected_category]
+
+    # Group by market and calculate average price
+    price_comparison = category_df.groupby('market')['price'].mean()
+
+    # Extract national average
+    national_avg = price_comparison.get('National Average', None)
+
+    # Remove national average from other centers
+    market_prices = price_comparison.drop('National Average', errors='ignore')
+    plot_df = pd.DataFrame({
+        'Economic Center Price': market_prices,
+        'National Average': national_avg
+    })
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    plot_df.plot(kind='bar', ax=ax)
+
+    ax.set_title(f"{selected_category} – Economic Centers vs National Average")
+    ax.set_xlabel("Economic Center")
+    ax.set_ylabel("Average Price")
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+
+    # Show plot
+    st.pyplot(fig)
+    
+    
 if page == "Overview":
+
     st.markdown(
         "<p style='font-size:22px; color:White;'>Overview:</p>",
         unsafe_allow_html=True
@@ -114,6 +166,22 @@ if page == "Overview":
     )
     # Display the DataFrame
     st.dataframe(df.head())
+    st.markdown(
+        """
+        <br>
+        <p style='font-size:18px; color:orange;'>🔧 Data Preparation Steps:</p>
+        <ul style='font-size:16px; color:white;'>
+            <li>🧹 Imputed missing values in key columns to ensure data completeness.</li>
+            <li>📅 Converted column data types (e.g., date fields to datetime).</li>
+            <li>🗑️ Removed irrelevant rows and outlier records based on domain knowledge.</li>
+            <li>✏️ Renamed columns for clarity and consistency.</li>
+            <li>🧪 Filtered dataset to include only selected economic centers and relevant categories.</li>
+            <li>🔍 Ensured consistency in category and market names for easier filtering and analysis.</li>
+        </ul>
+        """,
+        unsafe_allow_html=True
+    )
+
     # Create three columns
     col1, col2, col3 = st.columns(3)
 
@@ -163,7 +231,7 @@ if page == "Overview":
             st.dataframe(missing_df)
         else:
             st.success("No missing values found 🎉")
-
+    
 
 
             
