@@ -91,7 +91,7 @@ if page == "Food Prices":
 
     # Line Chart: Price Trend
     st.markdown(
-    "<h3 style='color: orange;'>📈 Price Trend Over Time</h3>", 
+    "<h3 style='color: orange;'> Price Trend Over Time</h3>", 
     unsafe_allow_html=True
     )
 
@@ -135,24 +135,41 @@ if page == "Food Prices":
     # Remove national average from other centers
     market_prices = price_comparison.drop('National Average', errors='ignore')
 
-    # Build DataFrame for plotting
-    plot_df = pd.DataFrame({
-        'Economic Center Price': market_prices,
-        'National Average': national_avg
-      })  
+    bar_df = (
+    market_prices.reset_index(name='Economic Center Price')
+    .rename(columns={'market': 'Economic Center'})
+    )
 
-    # Plot
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plot_df.plot(kind='bar', ax=ax)
 
-    ax.set_title(f"{selected_category} – Economic Centers vs National Average")
-    ax.set_xlabel("Economic Center")
-    ax.set_ylabel("Average Price")
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
+    # add a column that repeats the national average for each center
+    bar_df['National Average'] = national_avg
 
-    # Display plot in Streamlit
-    st.pyplot(fig)
+    # reshape to “long” format → Economic Center, Series, Average Price
+    bar_df = bar_df.melt(
+        id_vars='Economic Center',
+        var_name='Series',
+        value_name='Average Price'
+    )
+
+
+    # ─── Plot ──────────────────────────────────────────────────────
+    fig_bar = px.bar(
+        bar_df,
+        x='Economic Center',
+        y='Average Price',
+        color='Series',
+        barmode='group',                 # side‑by‑side bars; use 'stack' if you prefer
+        title=f"{selected_category} – Economic Centers vs National Average",
+        height=550
+    )
+    fig_bar.update_layout(
+        xaxis_title='Economic Center',
+        yaxis_title='Average Price (LKR)',
+        legend_title_text='',
+        margin=dict(l=30, r=30, t=60, b=40)
+    )
+
+    st.plotly_chart(fig_bar, use_container_width=True)
     # Assuming you've already read and processed your dataset
     df['year_month'] = df['date'].dt.to_period('M').astype(str)
 
@@ -200,17 +217,17 @@ if page == "Food Prices":
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown(f"<h4 style='color:green;'>📉 Lowest Food Prices in {selected_month}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color:green;'> Lowest Food Prices in {selected_month}</h4>", unsafe_allow_html=True)
         st.dataframe(min_df)
 
     with col2:
-        st.markdown(f"<h4 style='color:red;'>📈 Highest Food Prices in {selected_month}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color:red;'> Highest Food Prices in {selected_month}</h4>", unsafe_allow_html=True)
         st.dataframe(max_df)
         
     
 
     # Page setup
-    st.title("📊 Monthly Food Price Highlights")
+    st.title(" Monthly Food Price Highlights")
 
     # Dropdown to select year and month
     selected_period = st.selectbox(
@@ -252,17 +269,17 @@ if page == "Food Prices":
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric(label="📈 Highest Price", value=f"Rs. {highest['price']:.2f}",
+        st.metric(label=" Highest Price", value=f"Rs. {highest['price']:.2f}",
                   delta=f"{highest['commodity']} at {highest['market']}")
 
     with col2:
-        st.metric(label="📉 Lowest Price", value=f"Rs. {lowest['price']:.2f}", 
+        st.metric(label=" Lowest Price", value=f"Rs. {lowest['price']:.2f}", 
                   delta=f"{lowest['commodity']} at {lowest['market']}")
 
     with col3:
         st.metric(label="🇱🇰 National Average", value=f"Rs. {national_avg:.2f}", 
                   delta=f"For {selected_period}")
-    st.title("📈 Price Changes Over Time")
+    st.title(" Price Changes Over Time")
     st.sidebar.header("Filter Options")
 
     # Date range filter
@@ -297,22 +314,37 @@ if page == "Food Prices":
     elif filtered_df.empty:
         st.info("No data available for the selected filters.")
     else:
-        st.subheader(f"📊 Price Trends for {selected_category} ({selected_saletype})")
+        st.subheader(f" Price Trends for {selected_category} ({selected_saletype})")
 
-        # Plot line chart using matplotlib
-        fig, ax = plt.subplots(figsize=(12, 6))
-        for commodity in selected_commodities:
-            data = filtered_df[filtered_df['commodity'] == commodity]
-            ax.plot(data['date'], data['price'], label=commodity)
+        # ---- Build a Plotly line chart ---------------------------------------------
+        if selected_commodities:
+            line_df = filtered_df[filtered_df['commodity'].isin(selected_commodities)]
 
-        ax.set_title(f"Price Changes Over Time – {selected_category}")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Price (LKR)")
-        ax.legend(title="Food Item")
-        ax.grid(True)
-        plt.tight_layout()
+            fig = px.line(
+                line_df,
+                x='date',
+                y='price',
+                color='commodity',
+                labels={
+                    'date': 'Date',
+                    'price': 'Price (LKR)',
+                    'commodity': 'Food Item'
+                },
+                title=f"Price Changes Over Time – {selected_category}",
+                height=550
+            )
+    
 
-        st.pyplot(fig)    
+            # Optional layout tweaks
+            fig.update_layout(
+                legend_title_text='Food Item',
+                hovermode='x unified',          # single hover box per x‑value
+                margin=dict(l=30, r=30, t=60, b=30)
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:st.info("Select at least one food item to see the price trend.")
     
     
 if page == "Overview":
@@ -350,7 +382,7 @@ if page == "Overview":
     # ---- Column 1: Summary Statistics ----
     with col1:
         st.markdown(
-        "<p style='font-size:18px; color:orange;'>📊 Summary Statistics</p>",
+        "<p style='font-size:18px; color:orange;'> Summary Statistics</p>",
         unsafe_allow_html=True
         )
 
@@ -360,7 +392,7 @@ if page == "Overview":
     # ---- Column 2: DataFrame Info ----
     with col2:
         st.markdown(
-        "<p style='font-size:18px; color:orange;'>🧾 Dataset Info</p>",
+        "<p style='font-size:18px; color:orange;'> Dataset Info</p>",
         unsafe_allow_html=True
         )
     
@@ -382,7 +414,7 @@ if page == "Overview":
     with col3:
         # Styled heading
         st.markdown(
-            "<p style='font-size:18px; color:orange; font-weight:bold;'>❗ Missing Values</p>",
+            "<p style='font-size:18px; color:orange; font-weight:bold;'> Missing Values</p>",
             unsafe_allow_html=True
         )
 
@@ -406,7 +438,7 @@ if page == "Overview":
                     border-radius: 8px;
                     font-size:16px;
                     '>
-                    No missing values found 🎉
+                    No missing values found 
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -417,7 +449,7 @@ if page == "About":
     import os
 
     # --- Page Title ---
-    st.title("📚 About Food Categories")
+    st.title(" About Food Categories")
 
     # Load dataset (replace with your actual DataFrame if needed)
     # df = pd.read_csv("your_data.csv")
@@ -462,7 +494,7 @@ if page == "About":
     
 
     # --- Show all food items in that category ---
-    st.markdown(f"### 🧺 Food Items in {selected_category}:")
+    st.markdown(f"###  Food Items in {selected_category}:")
     food_items = df[df['category'] == selected_category]['commodity'].dropna().unique()
     styled_food_items = f"""
     <div style='font-size:17px; color:#1e3d59; background-color:#f9f9f9; padding: 15px; border-left: 5px solid #ff914d; border-radius: 8px;'>
@@ -471,7 +503,7 @@ if page == "About":
     """
     st.markdown(styled_food_items, unsafe_allow_html=True)
 
-    st.markdown("### 🗺️ Price Distribution Map by Category & Commodity")
+    st.markdown("###  Price Distribution Map by Category & Commodity")
 
     # --- Unique Categories ---
     categories = df['category'].dropna().unique()
