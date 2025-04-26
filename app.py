@@ -14,7 +14,7 @@ df['date'] = pd.to_datetime(df['date'], errors='coerce')
 
 # Sidebar
 st.sidebar.title("CONTENT")
-page = st.sidebar.selectbox("Choose a page", ["Food Prices", "Overview", "About","Insight Section"])
+page = st.sidebar.selectbox("Choose a page", ["Food Prices", "Overview", "About","Insight Section","Test Dashboard"])
 st.markdown(
     """
     <style>
@@ -31,7 +31,7 @@ st.markdown(
         }
 
         /* Headings */
-        h1, h2, h3, h4 {
+        h1, h2, h3, h4, h5 {
             color: #F39C12;
         }
 
@@ -210,18 +210,27 @@ if page == "Food Prices":
     st.plotly_chart(fig_bar, use_container_width=True)
     
 # Assuming you've already read and processed your dataset
+    # Create year_month column
     df['year_month'] = df['date'].dt.to_period('M').astype(str)
-    # Sidebar: Select month-year
-    available_months = sorted(df['year_month'].dropna().unique())
-    selected_month = st.sidebar.selectbox("Select a Year-Month", available_months)
 
-    # Filter data for selected year-month
-    df_month = df[df['year_month'] == selected_month]
     # Dropdown to select year and month
-    selected_period = st.selectbox("Select Year and Month", sorted(df['year_month'].unique()))
+    available_months = sorted(df['year_month'].dropna().unique())
+    selected_period = st.sidebar.selectbox("Select Year-Month", available_months)
 
-    # Filter data by selected year and month
-    df_month = df[df['year_month'] == selected_period]
+    # Main area selectboxes (not sidebar)
+    st.markdown("### 🔍 Filter by Time Period and Category")
+
+    col_filter1, col_filter2 = st.columns(2)
+
+    with col_filter1:
+        selected_period = st.selectbox("Select Year-Month", sorted(df['year_month'].dropna().unique()), index=0, key="year_month_selectbox")
+
+    with col_filter2:
+        selected_category = st.selectbox("Select Food Category", sorted(df['category'].dropna().unique()),key="category_selectbox")
+
+    # Filter data
+    df_month = df[(df['year_month'] == selected_period) & (df['category'] == selected_category)]
+
 
     # National Averages
     national_avg = (
@@ -255,12 +264,13 @@ if page == "Food Prices":
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown(f"<h4 style='color:green;'> Lowest Food Prices in {selected_month}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color:green;'>Lowest Food Prices in {selected_period} ({selected_category})</h4>", unsafe_allow_html=True)
         st.dataframe(min_df)
 
     with col2:
-        st.markdown(f"<h4 style='color:red;'> Highest Food Prices in {selected_month}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color:red;'>Highest Food Prices in {selected_period} ({selected_category})</h4>", unsafe_allow_html=True)
         st.dataframe(max_df)
+
         
     
 
@@ -390,6 +400,38 @@ if page == "Food Prices":
 
 
         st.plotly_chart(fig, use_container_width=True)
+    # Create year_range column
+    def assign_year_range(x):
+        if x.year >= 2004 and x.year < 2009:
+            return '2004-2009'
+        elif x.year >= 2009 and x.year < 2014:
+            return '2009-2014'
+        elif x.year >= 2014 and x.year < 2019:
+            return '2014-2019'
+        elif x.year >= 2019 and x.year <= 2025:
+            return '2019-2025'
+        else:
+            return 'Other'
+
+    df['year_range'] = df['date'].apply(assign_year_range)
+    st.subheader("📅 Food Category Records Across Time Ranges")
+
+    # Group by year_range and category
+    range_category = df.groupby(['year_range', 'category']).size().reset_index(name='counts')
+
+    # Plot
+    fig3 = px.bar(
+        range_category,
+        x='year_range',
+        y='counts',
+        color='category',
+        title="Number of Food Categories Recorded Across Different Year Ranges",
+        labels={'year_range': 'Year Range', 'counts': 'Number of Records', 'category': 'Food Category'},
+        barmode='stack'
+    )
+
+    st.plotly_chart(fig3, use_container_width=True)
+
 
     
     
@@ -718,7 +760,146 @@ if page == "Insight Section":
     cat_pie = df[df['commodity'].isin(filtered_df['commodity'])].groupby('category')['price'].count().reset_index()
     fig2 = px.pie(cat_pie, names='category', values='price', title='Distribution by Category')
     st.plotly_chart(fig2, use_container_width=True)
-  
+if page == "Test Dashboard":
+    from streamlit_extras.metric_cards import style_metric_cards
+    from io import BytesIO
+    df['year_month'] = df['date'].dt.to_period('M').astype(str)
+    df['year'] = df['date'].dt.year
+
+    
+
+    # --- Custom CSS for Dark Theme + Fonts ---
+    st.markdown("""
+                <style>
+                .stApp {
+                background-color: #0e1117;
+                color: white;
+                font-family: 'Poppins', sans-serif;
+                }
+                .css-1d391kg {color: white;}
+                .css-qbe2hs {background-color: #0e1117;}
+                .block-container {padding: 2rem 2rem;}
+                </style>
+                <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+                """, unsafe_allow_html=True)
+
+    # --- Sidebar ---
+    st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3075/3075977.png", width=120)
+    st.sidebar.title("🍛 Food Price Dashboard")
+    page = st.sidebar.selectbox("Choose a page", ["Overview", "Insight Section", "Food Prices", "About"])
+
+    # --- Year Ranges ---
+    year_ranges = {
+        "2004-2009": (2004, 2009),
+        "2009-2014": (2009, 2014),
+        "2014-2019": (2014, 2019),
+        "2019-2025": (2019, 2025),
+    }
+    selected_range = st.sidebar.selectbox("Select Year Range", list(year_ranges.keys()))
+    start_year, end_year = year_ranges[selected_range]
+
+    filtered_df = df[(df['year'] >= start_year) & (df['year'] < end_year)]
+
+    # --- Page: Overview ---
+    if page == "Overview":
+        st.title("📈 Overview of Food Prices")
+        # Top Metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="💰 Highest Price", value=f"LKR {filtered_df['price'].max():,.2f}")
+        with col2:
+            st.metric(label="🛒 Lowest Price", value=f"LKR {filtered_df['price'].min():,.2f}")
+        with col3:
+            st.metric(label="📊 Average Price", value=f"LKR {filtered_df['price'].mean():,.2f}")
+            style_metric_cards(
+            background_color="#1f2229", 
+            border_left_color="#00FFFF", 
+            border_color="#00FFFF"
+            )
+            # Trend Line Chart
+            st.subheader("📅 Average Price Trend Over Time")
+            trend_df = filtered_df.groupby('year_month')['price'].mean().reset_index()
+            fig = px.line(
+                trend_df, x='year_month', y='price',
+                labels={'price': 'Average Price (LKR)', 'year_month': 'Year-Month'},
+                markers=True,
+                template="plotly_dark",
+                title="Average Monthly Food Price"
+            )
+            fig.update_traces(line_color='#00FFFF')
+            fig.update_layout(margin=dict(l=20, r=20, t=60, b=20))
+            st.plotly_chart(fig, use_container_width=True)
+
+    # --- Page: Insight Section ---
+    elif page == "Insight Section":
+        st.title("🔎 Insight Section")
+        tab1, tab2 = st.tabs(["💸 Top 5 Expensive", "💵 Top 5 Cheapest"])
+        with tab1:
+            top5_expensive = filtered_df.sort_values('price', ascending=False).head(5)
+            st.dataframe(top5_expensive[['commodity', 'price', 'market']])
+            # Download button
+            csv = top5_expensive.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download Top Expensive Foods",
+                data=csv,
+                file_name='top5_expensive.csv',
+                mime='text/csv'
+            )
+
+        with tab2:
+            top5_cheap = filtered_df.sort_values('price', ascending=True).head(5)
+            st.dataframe(top5_cheap[['commodity', 'price', 'market']])
+            csv = top5_cheap.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download Top Cheap Foods",
+                data=csv,
+                file_name='top5_cheap.csv',
+                mime='text/csv'
+            )
+            # Bar Chart Comparing Top 5
+            st.subheader("🏷 Price Comparison (Top Foods)")
+            compare_df = pd.concat([top5_expensive, top5_cheap])
+
+            fig = px.bar(
+                compare_df, x='commodity', y='price', color='price',
+                color_continuous_scale='reds',
+                template="plotly_dark",
+                title="Top 5 Highest and Lowest Priced Foods"
+            )
+            fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+            st.plotly_chart(fig, use_container_width=True)
+
+    # --- Page: Food Prices ---
+    elif page == "Food Prices":
+        st.title("🍽 Detailed Food Prices")
+        commodities = filtered_df['commodity'].dropna().unique()
+        selected_commodities = st.multiselect("Select Food Items", options=sorted(commodities), default=commodities[:5])
+        if selected_commodities:
+            chart_df = filtered_df[filtered_df['commodity'].isin(selected_commodities)]
+
+            fig = px.line(
+                chart_df,
+                x='date', y='price',
+                color='commodity',
+                template="plotly_dark",
+                title="Selected Food Items - Price Trend",
+                height=600
+            )
+        
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Please select at least one food item to view price trends.")
+
+    # --- Page: About ---
+    elif page == "About":
+        st.title("ℹ About This Dashboard")
+        st.write("""
+                 This dashboard visualizes **Sri Lankan Food Price Changes** over time,
+                 allowing users to explore different periods, trends, and top/bottom priced foods.
+                 
+                 ---
+                 **Created by:** Bineth Basilu 🚀
+                 """) 
 
 
 
