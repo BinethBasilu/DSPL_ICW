@@ -85,60 +85,116 @@ st.markdown(
 if page == "Food Prices":
     st.write("Here's the dataset:")
     st.dataframe(df)
-    st.sidebar.subheader('Query Parameter')
-    start_date = st.sidebar.date_input("Start date", datetime.date(2004, 1, 15))
-    end_date = st.sidebar.date_input("End date", datetime.date(2025, 3, 15))
+    import plotly.graph_objects as go
 
-    st.sidebar.header("Filter by food category")
+    # --- Load your data ---
+    # df = pd.read_csv('your_file.csv') # <-- load your data here
 
-    # Get unique food categories
+    # --- Sidebar filters (no date inputs now) ---
+    st.sidebar.header("Filters")
+
+      # Filter: Category
     categories = df['category'].dropna().unique()
-    selected_category = st.sidebar.selectbox("Choose a food category", sorted(categories))
+    selected_category = st.sidebar.selectbox("Select Food Category", sorted(categories))
 
-    # Filter data to get commodities only under the selected category
+    # Filter: Commodity based on selected category
     filtered_commodities = df[df['category'] == selected_category]['commodity'].dropna().unique()
+    selected_commodity = st.sidebar.selectbox("Select Food Name", sorted(filtered_commodities))
 
-    # Select food name from only the filtered commodities
-    selected_commodity = st.sidebar.selectbox("Choose a food name", sorted(filtered_commodities))
+    # Filter: Price Type
+    sale_types = df['pricetype'].dropna().unique()
+    selected_saletype = st.sidebar.selectbox("Select Price Type", sorted(sale_types))
 
-    # Final filter: based on selected food name
-    filtered_df = df[(df['category'] == selected_category) & (df['commodity'] == selected_commodity)]
-    # Get unique categories from the 'category' column
-    sale_Type = df['pricetype'].dropna().unique()
-    selected_saletype = st.sidebar.selectbox("Choose a price type", sorted(sale_Type))
-    # Filter data based on selection
-    filtered_df = df[df['pricetype'] == selected_saletype]
-    # Get unique categories from the 'category' column
-    District = df['District'].dropna().unique()
-    selected_district = st.sidebar.selectbox("Choose a district", sorted(District))
-    # Filter data based on selection
-    filtered_df = df[df['District'] == selected_district]
-     # ✅ Apply ALL filters at once
+    # Filter: District
+    districts = df['District'].dropna().unique()
+    selected_district = st.sidebar.selectbox("Select District", sorted(districts))
+
+    # --- Apply filters ---
     filtered_df = df[
         (df['category'] == selected_category) &
         (df['commodity'] == selected_commodity) &
         (df['pricetype'] == selected_saletype) &
-        (df['District'] == selected_district) 
+        (df['District'] == selected_district)
     ]
-    filtered_df = filtered_df[
-        filtered_df['date'].between(pd.to_datetime(start_date), pd.to_datetime(end_date))
-    ]
-    # Show table
-    st.write(f"### Prices for {selected_commodity} ({selected_saletype}) in {selected_category}")
+
+    # --- Show Table ---
+    st.markdown(
+        f"### 📋 Prices for {selected_commodity} ({selected_saletype}) in {selected_category} - {selected_district}",
+        unsafe_allow_html=True
+    )
     st.dataframe(filtered_df)
 
-    # Line Chart: Price Trend
+    # --- Plot Price Trend (Plotly) ---
     st.markdown(
-    "<h3 style='color: orange;'> Price Trend Over Time</h3>", 
-    unsafe_allow_html=True
+        "<h3 style='color: orange;'>📈 Price Trend Over Time</h3>",
+        unsafe_allow_html=True
     )
 
-
     if 'date' in filtered_df.columns and 'price' in filtered_df.columns and not filtered_df.empty:
-        price_chart_data = filtered_df.groupby('date')['price'].mean().reset_index()
-        st.line_chart(price_chart_data, x='date', y='price')
+        price_chart_data = (
+            filtered_df.groupby('date')['price']
+            .mean()
+            .reset_index()
+            .sort_values('date')
+        )
+        fig = go.Figure()
+
+        # Actual price line
+        fig.add_trace(go.Scatter(
+            x=price_chart_data['date'],
+            y=price_chart_data['price'],
+            mode='lines',
+            name=f'{selected_commodity} Price',
+            line=dict(color='blue')
+        ))
+        # Rolling 30-day Mean
+        if len(price_chart_data) >= 30:
+            price_chart_data['rolling_mean'] = price_chart_data['price'].rolling(window=30).mean()
+            fig.add_trace(go.Scatter(
+                x=price_chart_data['date'],
+                y=price_chart_data['rolling_mean'],
+                mode='lines',
+                name='30-day Rolling Average',
+                line=dict(color='red')
+            ))
+        # Highlight Special Periods (optional)
+        fig.add_vrect(
+            x0="2018-06-01", x1="2018-10-01",
+            fillcolor="red", opacity=0.2,
+            layer="below", line_width=0,
+        )
+        fig.add_vrect(
+            x0="2019-06-01", x1="2019-09-01",
+            fillcolor="red", opacity=0.2,
+            layer="below", line_width=0,
+        )
+
+        # Customize layout
+        fig.update_layout(
+            title=f"{selected_commodity} ({selected_saletype}) Price Trend in {selected_district}",
+            xaxis_title="Date",
+            yaxis_title="Price (LKR)",
+            hovermode="x unified",
+            height=600,
+            margin=dict(l=20, r=20, t=50, b=20),
+            template="plotly_white",
+            xaxis=dict(
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=1, label="1y", step="year", stepmode="backward"),
+                        dict(count=5, label="5y", step="year", stepmode="backward"),
+                        dict(step="all")
+                    ])
+                ),
+                rangeslider=dict(visible=True),  # ✅ Zoomable scroll bar at the bottom
+                type="date"
+            )
+        )   
+        # Show chart
+        st.plotly_chart(fig, use_container_width=True)
+
     else:
-        st.warning("Filtered data is empty or missing 'SL_FoodPrice'/'price' columns.")
+        st.warning("No data available for the selected filters. Please try different options.")
     # Page title
     st.title("Economic Centers vs National Average")
 
@@ -332,29 +388,25 @@ if page == "Food Prices":
     st.title(" Price Changes Over Time")
     st.sidebar.header("Filter Options")
 
-    # Date range filter
-    start_date = st.sidebar.date_input("Start Date", datetime.date(2004, 1, 15))
-    end_date = st.sidebar.date_input("End Date", datetime.date(2025, 3, 15))
+    
 
     # Category selection
     categories = df['category'].dropna().unique()
-    selected_category = st.sidebar.selectbox("Select Food Category", sorted(categories))
+    selected_category = st.sidebar.selectbox("Select Food Category", sorted(categories),key="category_selectbox_1")
 
     # Commodity (food item) multiselect based on selected category
     filtered_commodities = df[df['category'] == selected_category]['commodity'].dropna().unique()
-    selected_commodities = st.sidebar.multiselect("Select Food Items", sorted(filtered_commodities))
+    selected_commodities = st.sidebar.multiselect("Select Food Items", sorted(filtered_commodities),key="commodity_multiselect")
 
     # Price type filter
     sale_types = df['pricetype'].dropna().unique()
-    selected_saletype = st.sidebar.selectbox("Select Price Type", sorted(sale_types))
+    selected_saletype = st.sidebar.selectbox("Select Price Type", sorted(sale_types),key="pricetype_selectbox")
 
     # Filter dataset
     filtered_df = df[
         (df['category'] == selected_category) &
         (df['commodity'].isin(selected_commodities)) &
-        (df['pricetype'] == selected_saletype) &
-        (df['date'] >= pd.to_datetime(start_date)) &
-        (df['date'] <= pd.to_datetime(end_date))
+        (df['pricetype'] == selected_saletype) 
     ]
 
 
