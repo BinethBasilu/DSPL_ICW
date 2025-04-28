@@ -4,6 +4,7 @@ import numpy as np
 import datetime
 import matplotlib.pyplot as plt
 import plotly.express as px
+import seaborn as sns 
 
 # Set page config to use the full width
 st.set_page_config(layout="wide")
@@ -519,7 +520,24 @@ if page == "Food Prices":
 
     st.plotly_chart(fig3, use_container_width=True)
 
+    st.markdown("## Records per Food Category")
+    category_counts = df['category'].value_counts().reset_index()
+    category_counts.columns = ['Category', 'Count']
 
+    fig_bar = px.bar(
+        category_counts,
+        x='Count',
+        y='Category',
+        orientation='h',
+        color='Count',
+        color_continuous_scale='Viridis',
+        title="Number of Records per Food Category",
+        labels={'Count': 'Number of Records', 'Category': 'Food Category'}
+    )
+
+    fig_bar.update_layout(yaxis=dict(categoryorder='total ascending'))
+
+    st.plotly_chart(fig_bar, use_container_width=True)
     
     
 if page == "Overview":
@@ -596,24 +614,7 @@ if page == "Overview":
         """,
         unsafe_allow_html=True
     )
-    st.markdown("## Records per Food Category")
-    category_counts = df['category'].value_counts().reset_index()
-    category_counts.columns = ['Category', 'Count']
 
-    fig_bar = px.bar(
-        category_counts,
-        x='Count',
-        y='Category',
-        orientation='h',
-        color='Count',
-        color_continuous_scale='Viridis',
-        title="Number of Records per Food Category",
-        labels={'Count': 'Number of Records', 'Category': 'Food Category'}
-    )
-
-    fig_bar.update_layout(yaxis=dict(categoryorder='total ascending'))
-
-    st.plotly_chart(fig_bar, use_container_width=True)
     
     
     
@@ -683,7 +684,50 @@ if page == "Overview":
                 """,
                 unsafe_allow_html=True
             )
-        
+    eda_option = st.sidebar.selectbox("Choose Analysis Type", ["Univariate Analysis", "Multivariate Analysis"])
+    if eda_option == "Univariate Analysis":
+        st.header("Univariate Analysis")
+        column = st.selectbox("Select a column for analysis", df.columns)
+    
+        if df[column].dtype == 'object':
+            st.subheader(f"Count plot for {column}")
+            fig, ax = plt.subplots()
+            sns.countplot(data=df, y=column, order=df[column].value_counts().index, palette="viridis")
+            st.pyplot(fig)
+        else:
+            st.subheader(f"Distribution for {column}")
+            fig, ax = plt.subplots()
+            sns.histplot(df[column], kde=True, color="skyblue")
+            st.pyplot(fig)
+
+            st.subheader(f"Boxplot for {column}")
+            fig2, ax2 = plt.subplots()
+            sns.boxplot(x=df[column], color="lightgreen")
+            st.pyplot(fig2)
+
+        st.subheader("Summary Statistics")
+        st.write(df[column].describe())
+    elif eda_option == "Multivariate Analysis":
+        st.header("Multivariate Analysis")
+    
+        st.subheader("Average Price by Market")
+        avg_market = df.groupby('market')['price'].mean().sort_values(ascending=False)
+        fig, ax = plt.subplots()
+        avg_market.plot(kind='bar', ax=ax, color='coral')
+        st.pyplot(fig)
+    
+        st.subheader("Average Price by Category")
+        avg_category = df.groupby('category')['price'].mean().sort_values(ascending=False)
+        fig2, ax2 = plt.subplots()
+        avg_category.plot(kind='barh', ax=ax2, color='lightblue')
+        st.pyplot(fig2)
+    
+        st.subheader("Correlation Heatmap (only numeric columns)")
+        corr = df.select_dtypes(include=['float64']).corr()
+        fig3, ax3 = plt.subplots()
+        sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax3)
+        st.pyplot(fig3)
+   
 
 if page == "About":
     import os
