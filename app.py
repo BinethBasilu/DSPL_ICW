@@ -5,6 +5,7 @@ import datetime
 import matplotlib.pyplot as plt
 import plotly.express as px
 import seaborn as sns 
+import plotly.graph_objects as go
 
 # Set page config to use the full width
 st.set_page_config(layout="wide")
@@ -15,7 +16,7 @@ df['date'] = pd.to_datetime(df['date'], errors='coerce')
 
 # Sidebar
 st.sidebar.title("CONTENT")
-page = st.sidebar.selectbox("Choose a page", ["Food Prices", "Overview", "About","Insight Section"])
+page = st.sidebar.selectbox("Choose a page", ["About","Overview","Price Trends" ,"Economic centres VS National Average"])
 st.markdown(
     """
     <style>
@@ -83,15 +84,7 @@ st.markdown(
 
 
 
-if page == "Food Prices":
-    st.write("Here's the dataset:")
-    st.dataframe(df)
-    import plotly.graph_objects as go
-
-    # --- Load your data ---
-    # df = pd.read_csv('your_file.csv') # <-- load your data here
-
-    # --- Sidebar filters (no date inputs now) ---
+if page == "Price Trends":
     st.sidebar.header("Price Trend Over Time")
 
       # Filter: Category
@@ -196,75 +189,9 @@ if page == "Food Prices":
 
     else:
         st.warning("No data available for the selected filters. Please try different options.")
-    
-    st.title("Economic Centers vs National Average")
 
     
-    economic_centers = [
-        'Economic Centre-Dambulla', 
-        'Economic Centre - Peliyagoda', 
-        'Economic Centre-Pettah', 
-        'Fish market-Peliyagoda', 
-        'Fish market-Negombo', 
-        'Economic Centre-Maradagahamula',
-        'National Average'
-    ]
 
-
-    
-    filtered_df = df[df['market'].isin(economic_centers)]
-
-    
-    category_options = filtered_df['category'].unique()
-    selected_category = st.selectbox("Select Category", category_options)
-
-    
-    category_df = filtered_df[filtered_df['category'] == selected_category]
-
-    
-    price_comparison = category_df.groupby('market')['price'].mean()
-
-    
-    national_avg = price_comparison.get('National Average', None)
-
-    
-    market_prices = price_comparison.drop('National Average', errors='ignore')
-
-    bar_df = (
-    market_prices.reset_index(name='Economic Center Price')
-    .rename(columns={'market': 'Economic Center'})
-    )
-
-
-    
-    bar_df['National Average'] = national_avg
-
-    
-    bar_df = bar_df.melt(
-        id_vars='Economic Center',
-        var_name='Series',
-        value_name='Average Price'
-    )
-
-
-    
-    fig_bar = px.bar(
-        bar_df,
-        x='Economic Center',
-        y='Average Price',
-        color='Series',
-        barmode='group',                 
-        title=f"{selected_category} – Economic Centers vs National Average",
-        height=550
-    )
-    fig_bar.update_layout(
-        xaxis_title='Economic Center',
-        yaxis_title='Average Price (LKR)',
-        legend_title_text='',
-        margin=dict(l=30, r=30, t=60, b=40)
-    )
-
-    st.plotly_chart(fig_bar, use_container_width=True)
     
 
     df['year_month'] = df['date'].dt.to_period('M').astype(str)
@@ -452,42 +379,7 @@ if page == "Food Prices":
 
 
         st.plotly_chart(fig, use_container_width=True)
-    national_df = df[df['market'] == 'National Average'].copy()
-
     
-    national_df['date'] = pd.to_datetime(national_df['date'])
-
-    
-    national_avg_trend = national_df.groupby(['date', 'commodity'])['price'].mean().reset_index()
-
-    
-    available_na_commodities = national_avg_trend['commodity'].unique()
-
-    
-    selected_na_commodity = st.selectbox(
-        " Select Food Item (National Average only)",
-        sorted(available_na_commodities),
-        key="na_commodity"
-    )
-
-    
-    na_filtered = national_avg_trend[national_avg_trend['commodity'] == selected_na_commodity]
-
-    
-    st.subheader(f" National Average Trend for {selected_na_commodity}")
-    fig = px.line(
-        na_filtered,
-        x='date',
-        y='price',
-        title=f"National Average Price Over Time – {selected_na_commodity}",
-        labels={"date": "Date", "price": "Price (LKR)"}
-    )
-    fig.update_layout(hovermode='x unified', height=500)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-    st.markdown("###  National Average Prices (Filtered Dates Only)")
-    st.dataframe(na_filtered.sort_values(by="date", ascending=False), use_container_width=True)    
     # Create year_range column
     def assign_year_range(x):
         if x.year >= 2004 and x.year < 2009:
@@ -538,9 +430,101 @@ if page == "Food Prices":
     fig_bar.update_layout(yaxis=dict(categoryorder='total ascending'))
 
     st.plotly_chart(fig_bar, use_container_width=True)
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['year_month'] = df['date'].dt.to_period('M').astype(str)
+
+   
+    st.sidebar.title(" Filter Options")
+
+   
+    categories = df['category'].dropna().unique()
+    selected_category = st.sidebar.selectbox("Select Food Category", sorted(categories), key='sidebar_category')
+
+   
+    filtered_commodities = df[df['category'] == selected_category]['commodity'].dropna().unique()
+    selected_commodities = st.sidebar.multiselect("Select Commodities", sorted(filtered_commodities), key='sidebar_commodities')
+
+   
+    price_types = df['pricetype'].dropna().unique()
+    selected_price_type = st.sidebar.selectbox("Select Price Type", sorted(price_types), key='sidebar_price_type')
+
+   
+    min_date = df['date'].min()
+    max_date = df['date'].max()
+    start_date, end_date = st.sidebar.date_input("Date Range", [min_date, max_date], key='sidebar_date_range')
+
+    filtered_df = df[
+        (df['category'] == selected_category) &
+        (df['commodity'].isin(selected_commodities)) &
+        (df['pricetype'] == selected_price_type) &
+        (df['date'] >= pd.to_datetime(start_date)) &
+        (df['date'] <= pd.to_datetime(end_date))
+    ]
+
     
+    st.markdown("""
+                <h1 style='text-align: center; color: orange;'>🇱🇰 Sri Lanka Food Price Dashboard</h1>
+                """, unsafe_allow_html=True)
+
     
-if page == "Overview":
+    st.markdown("###  Key Metrics")
+    col1, col2, col3 = st.columns(3)
+
+    latest_month = filtered_df['year_month'].max()
+    latest_prices = filtered_df[filtered_df['year_month'] == latest_month].groupby('commodity')['price'].mean()
+
+    if not latest_prices.empty:
+        col1.metric(" Total Items", f"{len(latest_prices)}")
+        col2.metric(" Highest Price", f"LKR {latest_prices.max():,.2f}")
+        col3.metric(" Lowest Price", f"LKR {latest_prices.min():,.2f}")
+    else:
+       col1.write("No data for metrics.")
+
+   
+    st.markdown("###  Price Trends Over Time")
+    if filtered_df.empty:
+        st.warning("No data available for the selected filters.")
+    else:
+        line_fig = px.line(
+            filtered_df,
+            x='date',
+            y='price',
+            color='commodity',
+            title=f"Price Trend ({selected_price_type}) – {selected_category}",
+            labels={'price': 'Price (LKR)', 'date': 'Date', 'commodity': 'Food Item'},
+            height=500
+        )
+        line_fig.update_layout(hovermode='x unified')
+        st.plotly_chart(line_fig, use_container_width=True)
+
+    
+    st.markdown("###  Highest & Lowest Priced Items by Month")
+    month_df = df[
+        (df['pricetype'] == selected_price_type) &
+        (df['category'] == selected_category)
+        ].copy()
+    month_df = month_df.groupby(['year_month', 'commodity'])['price'].mean().reset_index()
+
+    max_price_df = month_df.loc[month_df.groupby('year_month')['price'].idxmax()]
+    min_price_df = month_df.loc[month_df.groupby('year_month')['price'].idxmin()]
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig_max = px.bar(max_price_df, x='year_month', y='price', color='commodity',
+                         title="Monthly Highest Price Items", labels={'price': 'Price (LKR)', 'year_month': 'Month'})
+        st.plotly_chart(fig_max, use_container_width=True)
+
+    with col2:
+        fig_min = px.bar(min_price_df, x='year_month', y='price', color='commodity',
+                         title="Monthly Lowest Price Items", labels={'price': 'Price (LKR)', 'year_month': 'Month'})
+        st.plotly_chart(fig_min, use_container_width=True)
+
+    
+        st.markdown("###  Category Distribution")
+        cat_pie = df[df['commodity'].isin(filtered_df['commodity'])].groupby('category')['price'].count().reset_index()
+        fig2 = px.pie(cat_pie, names='category', values='price', title='Distribution by Category')
+        st.plotly_chart(fig2, use_container_width=True)
     from streamlit_extras.metric_cards import style_metric_cards
     from io import BytesIO
     df['year_month'] = df['date'].dt.to_period('M').astype(str)
@@ -551,31 +535,34 @@ if page == "Overview":
         "2014-2019": (2014, 2019),
         "2019-2025": (2019, 2025),
     }
-    selected_range = st.sidebar.selectbox("Select Year Range", list(year_ranges.keys()))
+    
+    st.title(" Overview of Food Prices")
+    col_filter1, col_filter2 = st.columns(2)
+    with col_filter1:
+        selected_range = st.selectbox("Select Year Range", list(year_ranges.keys()),key="year_range_select")
+    with col_filter2:
+        categories = df['category'].dropna().unique()
+        selected_category = st.selectbox("Select Food Category", sorted(categories),key="category_select")
+
+    # Filter Data
     start_year, end_year = year_ranges[selected_range]
-
     filtered_df = df[(df['year'] >= start_year) & (df['year'] < end_year)]
-    categories = filtered_df['category'].dropna().unique()
-    selected_category = st.sidebar.selectbox("Select Food Category", sorted(categories))
-
-    # Final filtered dataset
     filtered_df = filtered_df[filtered_df['category'] == selected_category]
-    st.title("📈 Overview of Food Prices")
     # Top Metrics
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric(label="💰 Highest Price", value=f"LKR {filtered_df['price'].max():,.2f}")
+        st.metric(label=" Highest Price", value=f"LKR {filtered_df['price'].max():,.2f}")
     with col2:
-        st.metric(label="🛒 Lowest Price", value=f"LKR {filtered_df['price'].min():,.2f}")
+        st.metric(label=" Lowest Price", value=f"LKR {filtered_df['price'].min():,.2f}")
     with col3:
-        st.metric(label="📊 Average Price", value=f"LKR {filtered_df['price'].mean():,.2f}")
+        st.metric(label=" Average Price", value=f"LKR {filtered_df['price'].mean():,.2f}")
         style_metric_cards(
         background_color="#1f2229", 
         border_left_color="#00FFFF", 
         border_color="#00FFFF"
         )
     # Trend Line Chart
-    st.subheader("📅 Average Price Trend Over Time")
+    st.subheader(" Average Price Trend Over Time")
     trend_df = filtered_df.groupby('year_month')['price'].mean().reset_index()
     fig = px.line(
         trend_df, x='year_month', y='price',
@@ -587,6 +574,11 @@ if page == "Overview":
     fig.update_traces(line_color='#00FFFF')
     fig.update_layout(margin=dict(l=20, r=20, t=60, b=20))
     st.plotly_chart(fig, use_container_width=True)
+    
+if page == "Overview":
+    st.write("Here's the dataset:")
+    st.dataframe(df)
+    
 
     st.markdown(
         "<p style='font-size:22px; color:White;'>Overview:</p>",
@@ -602,7 +594,7 @@ if page == "Overview":
     st.markdown(
         """
         <br>
-        <p style='font-size:18px; color:orange;'>🔧 Data Preparation Steps:</p>
+        <p style='font-size:18px; color:orange;'> Data Preparation Steps:</p>
         <ul style='font-size:16px; color:white;'>
             <li> Imputed missing values in key columns to ensure data completeness.</li>
             <li> Converted column data types (e.g., date fields to datetime).</li>
@@ -684,53 +676,33 @@ if page == "Overview":
                 """,
                 unsafe_allow_html=True
             )
-    eda_option = st.sidebar.selectbox("Choose Analysis Type", ["Univariate Analysis", "Multivariate Analysis"])
-    if eda_option == "Univariate Analysis":
-        st.header("Univariate Analysis")
-        column = st.selectbox("Select a column for analysis", df.columns)
     
-        if df[column].dtype == 'object':
-            st.subheader(f"Count plot for {column}")
-            fig, ax = plt.subplots()
-            sns.countplot(data=df, y=column, order=df[column].value_counts().index, palette="viridis")
-            st.pyplot(fig)
-        else:
-            st.subheader(f"Distribution for {column}")
-            fig, ax = plt.subplots()
-            sns.histplot(df[column], kde=True, color="skyblue")
-            st.pyplot(fig)
-
-            st.subheader(f"Boxplot for {column}")
-            fig2, ax2 = plt.subplots()
-            sns.boxplot(x=df[column], color="lightgreen")
-            st.pyplot(fig2)
-
-        st.subheader("Summary Statistics")
-        st.write(df[column].describe())
-    elif eda_option == "Multivariate Analysis":
-        st.header("Multivariate Analysis")
-    
-        st.subheader("Average Price by Market")
-        avg_market = df.groupby('market')['price'].mean().sort_values(ascending=False)
-        fig, ax = plt.subplots()
-        avg_market.plot(kind='bar', ax=ax, color='coral')
-        st.pyplot(fig)
-    
-        st.subheader("Average Price by Category")
-        avg_category = df.groupby('category')['price'].mean().sort_values(ascending=False)
-        fig2, ax2 = plt.subplots()
-        avg_category.plot(kind='barh', ax=ax2, color='lightblue')
-        st.pyplot(fig2)
-    
-        st.subheader("Correlation Heatmap (only numeric columns)")
-        corr = df.select_dtypes(include=['float64']).corr()
-        fig3, ax3 = plt.subplots()
-        sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax3)
-        st.pyplot(fig3)
-   
-
 if page == "About":
+    
     import os
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-image: url("https://images.unsplash.com/photo-1739346939000-e771a5c94af8?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTIyfHxmb3IlMjBhJTIwZm9vZCUyMHByaWNlJTIwY2hhbmdlcyUyMGRhc2hib2FyZCUyMGJhY2tncm91bmR8ZW58MHx8MHx8fDA%3D");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.title("About")
+    st.write("""
+        Welcome to the Sri Lanka Food Price Dashboard.
+
+        This platform helps visualize food price variations across major economic centers.
+        Explore insights, trends, and market-specific details.
+    """)
+
 
     
     st.title(" About Food Categories")
@@ -840,104 +812,121 @@ if page == "About":
         st.plotly_chart(fig_map)
     else:
         st.info("No map data available for this combination.")
-if page == "Insight Section":
-   
-   df['date'] = pd.to_datetime(df['date'], errors='coerce')
-   df['year_month'] = df['date'].dt.to_period('M').astype(str)
 
-   
-   st.sidebar.title(" Filter Options")
-
-   
-   categories = df['category'].dropna().unique()
-   selected_category = st.sidebar.selectbox("Select Food Category", sorted(categories), key='sidebar_category')
-
-   
-   filtered_commodities = df[df['category'] == selected_category]['commodity'].dropna().unique()
-   selected_commodities = st.sidebar.multiselect("Select Commodities", sorted(filtered_commodities), key='sidebar_commodities')
-
-   
-   price_types = df['pricetype'].dropna().unique()
-   selected_price_type = st.sidebar.selectbox("Select Price Type", sorted(price_types), key='sidebar_price_type')
-
-   
-   min_date = df['date'].min()
-   max_date = df['date'].max()
-   start_date, end_date = st.sidebar.date_input("Date Range", [min_date, max_date], key='sidebar_date_range')
-
-   filtered_df = df[
-       (df['category'] == selected_category) &
-       (df['commodity'].isin(selected_commodities)) &
-       (df['pricetype'] == selected_price_type) &
-       (df['date'] >= pd.to_datetime(start_date)) &
-       (df['date'] <= pd.to_datetime(end_date))
-   ]
 
     
-   st.markdown("""
-               <h1 style='text-align: center; color: orange;'>🇱🇰 Sri Lanka Food Price Dashboard</h1>
-   """, unsafe_allow_html=True)
+if page == "Economic centres VS National Average":
+       st.title("Economic Centers vs National Average")
+       economic_centers = [
+           'Economic Centre-Dambulla', 
+           'Economic Centre - Peliyagoda', 
+           'Economic Centre-Pettah', 
+           'Fish market-Peliyagoda', 
+           'Fish market-Negombo', 
+           'Economic Centre-Maradagahamula',
+           'National Average'
+       ]
+       filtered_df = df[df['market'].isin(economic_centers)]
+       category_options = filtered_df['category'].unique()
+       selected_category = st.selectbox("Select Category", category_options)
 
     
-   st.markdown("###  Key Metrics")
-   col1, col2, col3 = st.columns(3)
+       category_df = filtered_df[filtered_df['category'] == selected_category]
+       price_comparison = category_df.groupby('market')['price'].mean()
+       national_avg = price_comparison.get('National Average', None)
+       market_prices = price_comparison.drop('National Average', errors='ignore')
+       bar_df = (
+           market_prices.reset_index(name='Economic Center Price')
+           .rename(columns={'market': 'Economic Center'})
+       )
+       bar_df['National Average'] = national_avg
+       bar_df = bar_df.melt(
+           id_vars='Economic Center',
+           var_name='Series',
+           value_name='Average Price'
+       )
 
-   latest_month = filtered_df['year_month'].max()
-   latest_prices = filtered_df[filtered_df['year_month'] == latest_month].groupby('commodity')['price'].mean()
 
-   if not latest_prices.empty:
-       col1.metric(" Total Items", f"{len(latest_prices)}")
-       col2.metric(" Highest Price", f"LKR {latest_prices.max():,.2f}")
-       col3.metric(" Lowest Price", f"LKR {latest_prices.min():,.2f}")
-   else:
-       col1.write("No data for metrics.")
+    
+       fig_bar = px.bar(
+           bar_df,
+           x='Economic Center',
+           y='Average Price',
+           color='Series',
+           barmode='group',                 
+           title=f"{selected_category} – Economic Centers vs National Average",
+           height=550
+       )
+       fig_bar.update_layout(
+           xaxis_title='Economic Center',
+           yaxis_title='Average Price (LKR)',
+           legend_title_text='',
+           margin=dict(l=30, r=30, t=60, b=40)
+       )
 
+       st.plotly_chart(fig_bar, use_container_width=True)
+
+
+       national_df = df[df['market'] == 'National Average'].copy()
+       national_df['date'] = pd.to_datetime(national_df['date'])
+       national_avg_trend = national_df.groupby(['date', 'commodity'])['price'].mean().reset_index()
+       available_na_commodities = national_avg_trend['commodity'].unique()
+       selected_na_commodity = st.selectbox(
+           " Select Food Item (National Average only)",
+           sorted(available_na_commodities),
+           key="na_commodity"
+       )
+       na_filtered = national_avg_trend[national_avg_trend['commodity'] == selected_na_commodity]
+       st.subheader(f" National Average Trend for {selected_na_commodity}")
+       fig = px.line(
+           na_filtered,
+           x='date',
+           y='price',
+           title=f"National Average Price Over Time – {selected_na_commodity}",
+           labels={"date": "Date", "price": "Price (LKR)"}
+       )
+       fig.update_layout(hovermode='x unified', height=500)
+       st.plotly_chart(fig, use_container_width=True)
+
+
+       st.markdown("###  National Average Prices (Filtered Dates Only)")
+       st.dataframe(na_filtered.sort_values(by="date", ascending=False), use_container_width=True)
+
+       centers = [
+           'Economic Centre-Dambulla',
+           'Economic Centre - Peliyagoda',
+           'Economic Centre-Pettah',
+           'Fish market-Peliyagoda',
+           'Fish market-Negombo',
+           'Economic Centre-Maradagahamula'
+       ]
+       center_descriptions = {
+            'Economic Centre-Dambulla': "A major agricultural hub supplying central and northern regions.",
+            'Economic Centre - Peliyagoda': "Key wholesale market close to Colombo, handling both vegetables and fruits.",
+            'Economic Centre-Pettah': "Busy trade center located in the heart of Colombo city.",
+            'Fish market-Peliyagoda': "Primary wholesale fish market servicing Colombo and suburbs.",
+            'Fish market-Negombo': "Coastal market known for a variety of seafood.",
+            'Economic Centre-Maradagahamula': "Local trade center facilitating produce from surrounding rural areas."
+       }
+       selected_center = st.sidebar.selectbox("Select an Economic Center", centers)
+       center_data = df[df['market'] == selected_center]
+       st.markdown(f"##  {selected_center}")
+       st.write(center_descriptions.get(selected_center, "Description not available."))
+       if not center_data.empty:
+        st.markdown("###  Commodity Prices Overview")
+        commodity_stats = center_data.groupby('commodity')['price'].agg(['mean', 'min', 'max']).round(2).reset_index()
+        fig = px.bar(commodity_stats, x='commodity', y='mean',
+                     title=f"Average Prices by Commodity in {selected_center}",
+                     color='commodity', height=500)
+        st.plotly_chart(fig)
+        fig2 = px.bar(commodity_stats, x='commodity', y=['min', 'max'],
+              title=f"Minimum and Maximum Prices by Commodity in {selected_center}",
+              barmode='group', height=500,
+              labels={'value': 'Price', 'variable': 'Price Type'})
+        st.plotly_chart(fig2)
+       else:
+        st.warning("No data available for this economic center.")
    
-   st.markdown("###  Price Trends Over Time")
-   if filtered_df.empty:
-       st.warning("No data available for the selected filters.")
-   else:
-    line_fig = px.line(
-        filtered_df,
-        x='date',
-        y='price',
-        color='commodity',
-        title=f"Price Trend ({selected_price_type}) – {selected_category}",
-        labels={'price': 'Price (LKR)', 'date': 'Date', 'commodity': 'Food Item'},
-        height=500
-    )
-    line_fig.update_layout(hovermode='x unified')
-    st.plotly_chart(line_fig, use_container_width=True)
-
-    
-    st.markdown("###  Highest & Lowest Priced Items by Month")
-    month_df = df[
-        (df['pricetype'] == selected_price_type) &
-        (df['category'] == selected_category)
-        ].copy()
-    month_df = month_df.groupby(['year_month', 'commodity'])['price'].mean().reset_index()
-
-    max_price_df = month_df.loc[month_df.groupby('year_month')['price'].idxmax()]
-    min_price_df = month_df.loc[month_df.groupby('year_month')['price'].idxmin()]
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        fig_max = px.bar(max_price_df, x='year_month', y='price', color='commodity',
-                         title="Monthly Highest Price Items", labels={'price': 'Price (LKR)', 'year_month': 'Month'})
-        st.plotly_chart(fig_max, use_container_width=True)
-
-    with col2:
-        fig_min = px.bar(min_price_df, x='year_month', y='price', color='commodity',
-                         title="Monthly Lowest Price Items", labels={'price': 'Price (LKR)', 'year_month': 'Month'})
-        st.plotly_chart(fig_min, use_container_width=True)
-
-    
-    st.markdown("###  Category Distribution")
-    cat_pie = df[df['commodity'].isin(filtered_df['commodity'])].groupby('category')['price'].count().reset_index()
-    fig2 = px.pie(cat_pie, names='category', values='price', title='Distribution by Category')
-    st.plotly_chart(fig2, use_container_width=True)
-
 
 
 
