@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import seaborn as sns 
 import plotly.graph_objects as go
-
+from streamlit_extras.metric_cards import style_metric_cards
+from io import BytesIO
 # Set page config to use the full width
 st.set_page_config(layout="wide")
 st.title(" Food Price Changes In Sri Lanka Over the Time")
@@ -116,9 +117,9 @@ if page == "Price Trends":
         f"###  Prices for {selected_commodity} ({selected_saletype}) in {selected_category} - {selected_district}",
         unsafe_allow_html=True
     )
-    st.dataframe(filtered_df)
+    
 
-    # --- Plot Price Trend (Plotly) ---
+    
     st.markdown(
         "<h3 style='color: orange;'> Price Trend Over Time</h3>",
         unsafe_allow_html=True
@@ -189,7 +190,7 @@ if page == "Price Trends":
 
     else:
         st.warning("No data available for the selected filters. Please try different options.")
-
+    st.dataframe(filtered_df)
     
 
     
@@ -201,7 +202,7 @@ if page == "Price Trends":
     selected_period = st.sidebar.selectbox("Select Year-Month", available_months)
 
     
-    st.markdown("### 🔍 Filter by Time Period and Category")
+    st.markdown("###  Filter by Time Period and Category")
 
     col_filter1, col_filter2 = st.columns(2)
 
@@ -430,74 +431,43 @@ if page == "Price Trends":
     fig_bar.update_layout(yaxis=dict(categoryorder='total ascending'))
 
     st.plotly_chart(fig_bar, use_container_width=True)
+
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
     df['year_month'] = df['date'].dt.to_period('M').astype(str)
 
    
-    st.sidebar.title(" Filter Options")
+    st.markdown("## Filter Options")
 
-   
-    categories = df['category'].dropna().unique()
-    selected_category = st.sidebar.selectbox("Select Food Category", sorted(categories), key='sidebar_category')
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        categories = df['category'].dropna().unique()
+        selected_category = st.selectbox("Select Food Category", sorted(categories), key='top_category')
 
-   
-    filtered_commodities = df[df['category'] == selected_category]['commodity'].dropna().unique()
-    selected_commodities = st.sidebar.multiselect("Select Commodities", sorted(filtered_commodities), key='sidebar_commodities')
+    with col2:
+        price_types = df['pricetype'].dropna().unique()
+        selected_price_type = st.selectbox("Select Price Type", sorted(price_types), key='top_price_type')
 
-   
-    price_types = df['pricetype'].dropna().unique()
-    selected_price_type = st.sidebar.selectbox("Select Price Type", sorted(price_types), key='sidebar_price_type')
+    
+    with col3:
+        year_ranges = {
+            "2004-2009": (2004, 2009),
+            "2009-2014": (2009, 2014),
+            "2014-2019": (2014, 2019),
+            "2019-2025": (2019, 2025),
+        }
+        selected_range = st.selectbox("Select Year Range", list(year_ranges.keys()), key='top_year_range')
+        start_year, end_year = year_ranges[selected_range]
 
-   
-    min_date = df['date'].min()
-    max_date = df['date'].max()
-    start_date, end_date = st.sidebar.date_input("Date Range", [min_date, max_date], key='sidebar_date_range')
-
+    # Filter by year range
+    df['year'] = df['date'].dt.year
     filtered_df = df[
         (df['category'] == selected_category) &
         (df['commodity'].isin(selected_commodities)) &
         (df['pricetype'] == selected_price_type) &
-        (df['date'] >= pd.to_datetime(start_date)) &
-        (df['date'] <= pd.to_datetime(end_date))
+        (df['year'] >= start_year) &
+        (df['year'] < end_year)
     ]
 
-    
-    st.markdown("""
-                <h1 style='text-align: center; color: orange;'>🇱🇰 Sri Lanka Food Price Dashboard</h1>
-                """, unsafe_allow_html=True)
-
-    
-    st.markdown("###  Key Metrics")
-    col1, col2, col3 = st.columns(3)
-
-    latest_month = filtered_df['year_month'].max()
-    latest_prices = filtered_df[filtered_df['year_month'] == latest_month].groupby('commodity')['price'].mean()
-
-    if not latest_prices.empty:
-        col1.metric(" Total Items", f"{len(latest_prices)}")
-        col2.metric(" Highest Price", f"LKR {latest_prices.max():,.2f}")
-        col3.metric(" Lowest Price", f"LKR {latest_prices.min():,.2f}")
-    else:
-       col1.write("No data for metrics.")
-
-   
-    st.markdown("###  Price Trends Over Time")
-    if filtered_df.empty:
-        st.warning("No data available for the selected filters.")
-    else:
-        line_fig = px.line(
-            filtered_df,
-            x='date',
-            y='price',
-            color='commodity',
-            title=f"Price Trend ({selected_price_type}) – {selected_category}",
-            labels={'price': 'Price (LKR)', 'date': 'Date', 'commodity': 'Food Item'},
-            height=500
-        )
-        line_fig.update_layout(hovermode='x unified')
-        st.plotly_chart(line_fig, use_container_width=True)
-
-    
     st.markdown("###  Highest & Lowest Priced Items by Month")
     month_df = df[
         (df['pricetype'] == selected_price_type) &
@@ -521,12 +491,13 @@ if page == "Price Trends":
         st.plotly_chart(fig_min, use_container_width=True)
 
     
-        st.markdown("###  Category Distribution")
-        cat_pie = df[df['commodity'].isin(filtered_df['commodity'])].groupby('category')['price'].count().reset_index()
-        fig2 = px.pie(cat_pie, names='category', values='price', title='Distribution by Category')
-        st.plotly_chart(fig2, use_container_width=True)
-    from streamlit_extras.metric_cards import style_metric_cards
-    from io import BytesIO
+    st.markdown("###  Category Distribution")
+    cat_pie = df[df['category'] == selected_category]['commodity'].value_counts().reset_index()
+    cat_pie.columns = ['commodity', 'count']
+    fig2 = px.pie(cat_pie, names='commodity', values='count', title=f'Commodity Distribution in {selected_category}')
+    st.plotly_chart(fig2, use_container_width=True)  
+
+
     df['year_month'] = df['date'].dt.to_period('M').astype(str)
     df['year'] = df['date'].dt.year
     year_ranges = {
@@ -684,7 +655,7 @@ if page == "About":
         """
         <style>
         .stApp {
-            background-image: url("https://images.unsplash.com/photo-1739346939000-e771a5c94af8?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTIyfHxmb3IlMjBhJTIwZm9vZCUyMHByaWNlJTIwY2hhbmdlcyUyMGRhc2hib2FyZCUyMGJhY2tncm91bmR8ZW58MHx8MHx8fDA%3D");
+            background-image: url("https://images.unsplash.com/photo-1649067846117-2d71b76be1e0?q=80&w=2011&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
             background-size: cover;
             background-repeat: no-repeat;
             background-attachment: fixed;
