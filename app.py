@@ -666,13 +666,29 @@ if page == "About":
         unsafe_allow_html=True
     )
 
-    st.title("About")
-    st.write("""
-        Welcome to the Sri Lanka Food Price Dashboard.
+    st.markdown(
+        """
+        <style>
+        .big-title {
+            -size: 40px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
+            margin-bottom: 10px;
+        }   
+        .sub-heading {
+            font-size: 20px;
+            color: white;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
-        This platform helps visualize food price variations across major economic centers.
-        Explore insights, trends, and market-specific details.
-    """)
+    st.markdown('<div class="big-title">Food Price Changes In Sri Lanka Over the Time</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-heading">Welcome to the Sri Lanka Food Price Dashboard.<br>This platform helps visualize food price variations across major economic centers. Explore insights, trends, and market-specific details.</div>', unsafe_allow_html=True)
+
 
 
     
@@ -752,30 +768,34 @@ if page == "About":
         sorted(commodities), 
         key="commodity_select"
     )
-
-
-    
+  
     map_df = filtered_df[
         (filtered_df['commodity'] == selected_commodity) &
         (filtered_df['latitude'].notna()) &
         (filtered_df['longitude'].notna()) &
         (filtered_df['price'].notna())
-    ]
-
-
+    ].copy()
+    economic_centers = ["Economic Centre-Dambulla","Economic Centre - Peliyagoda","Economic Centre-Pettah","Fish market-Peliyagoda","Fish market-Negombo","Economic Centre-Maradagahamula"]
     
+
+    map_df['highlight'] = map_df['market'].apply(lambda x: 'Key Center' if x.strip().lower() in [ec.lower() for ec in economic_centers] else 'Other Market')
+    color_map = {
+        'economic centers': 'blue',
+        'Other Market': 'red'
+    }
     if not map_df.empty:
         fig_map = px.scatter_map(
         map_df,
         lat="latitude",
         lon="longitude",
-        color="category",
+        color="market",
+        color_discrete_map=color_map,
         size="price",
         hover_name="commodity",
         hover_data=["market", "price"],
         zoom=6,
         height=550,
-        title=f" Price Distribution for {selected_commodity.title()} in {selected_category.title()}",
+        title=f"Price Distribution for {selected_commodity.title()} in {selected_category.title()}",
         )
     
         fig_map.update_layout(mapbox_style="carto-positron")
@@ -897,13 +917,3 @@ if page == "Economic centres VS National Average":
         st.plotly_chart(fig2)
        else:
         st.warning("No data available for this economic center.")
-   
-
-
-
-            
-
-
-
-
-
